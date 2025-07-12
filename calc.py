@@ -11,26 +11,12 @@ import re
 
 Window.clearcolor = (0, 0, 0, 1)
 
-symbol_map = {
-    'C': 'CLEAR',
-    'DEL': 'DELETE',
-    '/': '/',
-    '*': '*',
-    '=': '=',
-    '+': '+',
-    '-': '-',
-    '%': '%',
-    '.': '.',
-    '( )': 'PARENS'
-}
-
 class RoundButton(ButtonBehavior, Widget):
     def __init__(self, text, bg_color, on_press_callback, **kwargs):
         super().__init__(**kwargs)
         self.bg_color = bg_color
         self.on_press_callback = on_press_callback
         self.text = text
-
         self.label = Label(
             text=text,
             font_size=36,
@@ -38,13 +24,10 @@ class RoundButton(ButtonBehavior, Widget):
             halign='center',
             valign='middle'
         )
-
         self.add_widget(self.label)
-
         with self.canvas.before:
             Color(*self.bg_color)
             self.rect = RoundedRectangle(radius=[30])
-
         self.bind(pos=self.update_graphics, size=self.update_graphics)
 
     def update_graphics(self, *args):
@@ -79,13 +62,169 @@ class RoundButton(ButtonBehavior, Widget):
         self.label.pos = self.rect.pos
         self.label.text_size = self.rect.size
 
+class CalculatorLogic:
+    def __init__(self):
+        self.display = ""
+        self.history = ""
+        self.just_computed = False
+        self.operators = {'+', '-', '*', '/'}
+
+    def clear(self):
+        self.display = ""
+        self.history = ""
+        self.just_computed = False
+
+    def delete(self):
+        if self.display:
+            self.display = self.display[:-1]
+
+    def add_number(self, number):
+        if self.just_computed:
+            self.display = ""
+            self.history = ""
+            self.just_computed = False
+        self.display += number
+
+    def add_operator(self, operator):
+        if self.just_computed:
+            self.just_computed = False
+        
+        if not self.display:
+            if operator == '-':
+                self.display += operator
+        elif self.display[-1] in self.operators:
+            self.display = self.display[:-1] + operator
+        else:
+            self.display += operator
+
+    def add_decimal(self):
+        if self.just_computed:
+            self.display = ""
+            self.history = ""
+            self.just_computed = False
+        
+        current_number = self._get_current_number()
+        if '.' not in current_number:
+            self.display += '.'
+
+    def add_parenthesis(self):
+        if self.display.count('(') == self.display.count(')'):
+            self.display += '('
+        else:
+            self.display += ')'
+
+    def calculate_percentage(self):
+        try:
+            match = re.search(r'(.*?)([+\-])(\d+(?:\.\d+)?)$', self.display)
+            if match:
+                base_exp, operator, perc = match.groups()
+                base_val = self._evaluate_expression(base_exp)
+                perc_val = float(base_val) * float(perc) / 100
+                new_exp = f'{base_val}{operator}{perc_val}'
+                self.history = self.display + '%'
+                self.display = self._evaluate_expression(new_exp)
+            else:
+                result = float(self._evaluate_expression(self.display)) / 100
+                self.display = str(result)
+        except:
+            self.display = 'Error'
+
+    def calculate_result(self):
+        if self.display and self.display != 'Error':
+            self.history = self.display
+            self.display = self._evaluate_expression(self.display)
+            self.just_computed = True
+
+    def _get_current_number(self):
+        if not self.display:
+            return ""
+        
+        current_number = ""
+        for char in reversed(self.display):
+            if char in self.operators or char in '()':
+                break
+            current_number = char + current_number
+        return current_number
+
+    def _evaluate_expression(self, expression):
+        if not expression:
+            return 'Error'
+        
+        tokens = re.findall(r'\d+\.\d+|\d+|[()+\-*/]', expression)
+        if not tokens:
+            return 'Error'
+        
+        try:
+            rpn = self._parse_to_rpn(tokens)
+            result = self._compute_rpn(rpn)
+            return str(int(result)) if result == int(result) else str(result)
+        except:
+            return 'Error'
+
+    def _parse_to_rpn(self, tokens):
+        def precedence(op):
+            return {'+': 1, '-': 1, '*': 2, '/': 2}[op]
+        
+        output = []
+        ops = []
+        
+        for token in tokens:
+            if re.match(r'\d+(\.\d+)?', token):
+                output.append(float(token))
+            elif token in '+-*/':
+                while (ops and ops[-1] != '(' and 
+                       precedence(ops[-1]) >= precedence(token)):
+                    output.append(ops.pop())
+                ops.append(token)
+            elif token == '(':
+                ops.append(token)
+            elif token == ')':
+                while ops and ops[-1] != '(':
+                    output.append(ops.pop())
+                if ops:
+                    ops.pop()
+        
+        while ops:
+            output.append(ops.pop())
+        
+        return output
+
+    def _compute_rpn(self, rpn):
+        stack = []
+        for token in rpn:
+            if isinstance(token, float):
+                stack.append(token)
+            else:
+                if len(stack) < 2:
+                    raise ValueError("Invalid expression")
+                b = stack.pop()
+                a = stack.pop()
+                if token == '+':
+                    stack.append(a + b)
+                elif token == '-':
+                    stack.append(a - b)
+                elif token == '*':
+                    stack.append(a * b)
+                elif token == '/':
+                    if b == 0:
+                        raise ZeroDivisionError
+                    stack.append(a / b)
+        
+        if len(stack) != 1:
+            raise ValueError("Invalid expression")
+        
+        return stack[0]
+
 class Calculator(GridLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.logic = CalculatorLogic()
         self.cols = 1
         self.padding = 20
         self.spacing = 20
+        self._setup_ui()
 
+    def _setup_ui(self):
         self.history_label = Label(
             text="",
             font_size=28,
@@ -109,7 +248,7 @@ class Calculator(GridLayout):
             foreground_color=(1, 1, 1, 1),
             cursor_color=(1, 1, 1, 0)
         )
-        self.result.bind(size=self.force_align)
+        self.result.bind(size=self._force_align)
         self.add_widget(self.result)
 
         button_layout = GridLayout(
@@ -129,134 +268,69 @@ class Calculator(GridLayout):
 
         for row in buttons:
             for label in row:
-                is_operator = label in symbol_map
+                is_operator = label in ['C', 'DEL', '%', '/', '*', '-', '+', '=', '( )']
                 bg_color = (1.0, 0.5, 0.0, 1) if is_operator else (0.15, 0.15, 0.15, 1)
                 btn = RoundButton(
                     text=label,
                     bg_color=bg_color,
-                    on_press_callback=self.on_button
+                    on_press_callback=self._on_button_press
                 )
                 button_layout.add_widget(btn)
 
         self.add_widget(button_layout)
 
-    def force_align(self, instance, value):
+    def _force_align(self, instance, value):
         instance.text = instance.text
 
-    def on_button(self, instance):
-        t = instance.text
-        exp = self.result.text
-
-        if exp == 'Error' and t not in ['C', 'DEL']:
-            exp = ''
-            self.result.text = ''
-
-        value = symbol_map.get(t, t)
-
-        if value == '=':
-            self.history_label.text = exp
-            self.result.text = self.evaluate_expression(exp)
-        elif value == 'CLEAR':
-            self.result.text = ''
-            self.history_label.text = ''
-        elif value == 'DELETE':
-            if exp.strip():
-                tokens = re.findall(r'-?\d+\.\d+|-?\d+|[()+\-*/]', exp)
-                if tokens:
-                    new_exp = exp.rstrip()
-                    last_token = tokens[-1]
-                    if new_exp.endswith(last_token):
-                        self.result.text = new_exp[:-len(last_token)].rstrip()
-                    else:
-                        self.result.text = new_exp[:-1]
-                else:
-                    self.result.text = ''
-            else:
-                self.result.text = ''
-        elif value == '%':
-            try:
-                match = re.search(r'(.*?)([+\-])(\d+(?:\.\d+)?)$', exp)
-                if match:
-                    base_exp, operator, perc = match.groups()
-                    base_val = self.evaluate_expression(base_exp)
-                    perc_val = float(base_val) * float(perc) / 100
-                    new_exp = f'{base_val}{operator}{perc_val}'
-                    self.history_label.text = exp + '%'
-                    self.result.text = self.evaluate_expression(new_exp)
-                else:
-                    self.result.text = str(float(self.evaluate_expression(exp)) / 100)
-            except:
-                self.result.text = 'Error'
-        elif value == 'PARENS':
-            if exp.count('(') == exp.count(')'):
-                self.result.text += '('
-            else:
-                self.result.text += ')'
+    def _on_button_press(self, instance):
+        button_text = instance.text
+        
+        if button_text == 'C':
+            self._handle_clear()
+        elif button_text == 'DEL':
+            self._handle_delete()
+        elif button_text == '=':
+            self._handle_equals()
+        elif button_text == '%':
+            self._handle_percentage()
+        elif button_text == '( )':
+            self._handle_parenthesis()
+        elif button_text == '.':
+            self._handle_decimal()
+        elif button_text in '+-*/':
+            self._handle_operator(button_text)
         else:
-            if value in '+*/':
-                if not exp or exp[-1] in '+-*/':
-                    return
-            elif value == '-':
-                if not exp:
-                    self.result.text += value
-                    return
-                elif exp[-1] not in '0123456789.)':
-                    self.result.text += value
-                    return
-                elif exp[-1] in '+-*/':
-                    return
-            self.result.text += value
+            self._handle_number(button_text)
+        
+        self._update_display()
 
-    def evaluate_expression(self, expression):
-        def parse(tokens):
-            def precedence(op):
-                return {'+': 1, '-': 1, '*': 2, '/': 2}[op]
-            output = []
-            ops = []
-            i = 0
-            while i < len(tokens):
-                token = tokens[i]
-                if re.match(r'-?\d+(\.\d+)?', token):
-                    output.append(float(token))
-                elif token in '+-*/':
-                    while ops and ops[-1] != '(' and precedence(ops[-1]) >= precedence(token):
-                        output.append(ops.pop())
-                    ops.append(token)
-                elif token == '(':
-                    ops.append(token)
-                elif token == ')':
-                    while ops and ops[-1] != '(':
-                        output.append(ops.pop())
-                    ops.pop()
-                i += 1
-            while ops:
-                output.append(ops.pop())
-            return output
+    def _handle_clear(self):
+        self.logic.clear()
 
-        def compute(rpn):
-            stack = []
-            for token in rpn:
-                if isinstance(token, float):
-                    stack.append(token)
-                else:
-                    b = stack.pop()
-                    a = stack.pop()
-                    if token == '+': stack.append(a + b)
-                    elif token == '-': stack.append(a - b)
-                    elif token == '*': stack.append(a * b)
-                    elif token == '/':
-                        if b == 0: raise ZeroDivisionError
-                        stack.append(a / b)
-            return stack[0]
+    def _handle_delete(self):
+        self.logic.delete()
 
-        tokens = re.findall(r'-?\d+\.\d+|-?\d+|[()+\-*/]', expression)
-        if not tokens:
-            return 'Error'
-        try:
-            rpn = parse(tokens)
-            return str(compute(rpn))
-        except:
-            return 'Error'
+    def _handle_equals(self):
+        self.logic.calculate_result()
+
+    def _handle_percentage(self):
+        self.logic.calculate_percentage()
+
+    def _handle_parenthesis(self):
+        self.logic.add_parenthesis()
+
+    def _handle_decimal(self):
+        self.logic.add_decimal()
+
+    def _handle_operator(self, operator):
+        self.logic.add_operator(operator)
+
+    def _handle_number(self, number):
+        self.logic.add_number(number)
+
+    def _update_display(self):
+        self.result.text = self.logic.display
+        self.history_label.text = self.logic.history
 
 class CalculatorApp(App):
     def build(self):
