@@ -30,7 +30,6 @@ ERROR_COLOR = (0.8, 0.2, 0.2, 1)
 OPERATOR_BUTTON_COLOR = (1.0, 0.5, 0.0, 1)
 NUMBER_BUTTON_COLOR = (0.25, 0.25, 0.25, 1)
 
-
 class RoundButton(ButtonBehavior, Widget):
     def __init__(self, text, bg_color, on_press_callback, **kwargs):
         super().__init__(**kwargs)
@@ -71,7 +70,6 @@ class RoundButton(ButtonBehavior, Widget):
         self.label.size = self.rect.size
         self.label.pos = self.rect.pos
         self.label.text_size = self.rect.size
-
 
 class CalculatorLogic:
     def __init__(self):
@@ -131,6 +129,7 @@ class CalculatorLogic:
         try:
             if not self.display:
                 return
+            original = self.display
             match = re.search(r'(.*?)([+\-])(\d+(?:\.\d+)?)$', self.display)
             if match:
                 base_exp, operator, perc = match.groups()
@@ -140,7 +139,7 @@ class CalculatorLogic:
             else:
                 result = float(self._evaluate_expression(self.display)) / 100
             self.display = self._format_result(result)
-            self.history = self._format_display(self.display + '%')
+            self.history = self._format_display(original + '%')
             self._store_history()
             self.just_computed = True
         except (ValueError, ZeroDivisionError):
@@ -232,7 +231,6 @@ class CalculatorLogic:
             raise ValueError("Invalid expression")
         return stack[0]
 
-
 class HistoryPanel(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -263,7 +261,6 @@ class HistoryPanel(BoxLayout):
         if hasattr(self, 'calculator_ref'):
             self.calculator_ref.logic.calculation_history.clear()
             self.update_history([])
-
 
 class Calculator(BoxLayout):
     OPERATOR_SYMBOLS = {'÷': '/', '×': '*', '-': '-', '+': '+'}
@@ -366,11 +363,9 @@ class Calculator(BoxLayout):
     def _force_align(self, instance, value):
         instance.text = instance.text
 
-
 class CalculatorApp(App):
     def build(self):
         return Calculator()
-
 
 if __name__ == '__main__':
     CalculatorApp().run()
