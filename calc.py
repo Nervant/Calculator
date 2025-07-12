@@ -26,7 +26,7 @@ LABEL_FONT_SIZE = 20
 BUTTON_FONT_SIZE = 40
 DARK_GRAY = (0.3, 0.3, 0.3, 1)
 LIGHT_GRAY = (0.9, 0.9, 0.9, 1)
-ERROR_COLOR = (0.8, 0.2, 0.2, 1)
+CLEAR_BUTTON_COLOR = (0.8, 0.2, 0.2, 1)
 OPERATOR_BUTTON_COLOR = (1.0, 0.5, 0.0, 1)
 NUMBER_BUTTON_COLOR = (0.25, 0.25, 0.25, 1)
 
@@ -240,7 +240,7 @@ class HistoryPanel(BoxLayout):
         self.size_hint = (1, 1)
         header = BoxLayout(orientation='horizontal', size_hint_y=None, height=60)
         header.add_widget(Widget())
-        clear_btn = RoundButton('Clear', ERROR_COLOR, self.clear_history)
+        clear_btn = RoundButton('Clear', CLEAR_BUTTON_COLOR, self.clear_history)
         header.add_widget(clear_btn)
         self.add_widget(header)
         self.history_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
